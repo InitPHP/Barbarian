@@ -1,0 +1,184 @@
+#!/usr/bin/env php
+<?php
+if(isset($GLOBALS['_composer_autoload_path'])){
+    define('INIT_PHP_COMPOSER_AUTOLOAD_PHP', $GLOBALS['_composer_autoload_path']);
+}else{
+    foreach ([
+                 __DIR__ . '/../../autoload.php',
+                 __DIR__ . '/../vendor/autoload.php',
+                 __DIR__ . '/vendor/autoload.php'
+             ] as $file) {
+        if(file_exists($file)){
+            define('INIT_PHP_COMPOSER_AUTOLOAD_PHP', $file);
+            break;
+        }
+    }
+}
+if(!defined("INIT_PHP_COMPOSER_AUTOLOAD_PHP")){
+    echo "\e[41;1;97mComposer autoload file not found. " . PHP_EOL . "Try running the \"composer install\" command.\e[0m" . PHP_EOL;
+    exit;
+}
+require_once INIT_PHP_COMPOSER_AUTOLOAD_PHP;
+use \InitPHP\Console\Console;
+
+foreach ([
+            getcwd() . '/barbarian.json',
+             __DIR__ . '/../barbarian.json',
+             __DIR__ . '/../../barbarian.json',
+             __DIR__ . '/../../../barbarian.json',
+             __DIR__ . '/barbarian.json',
+         ] as $config_file) {
+    if(file_exists($config_file)){
+        define('INIT_PHP_BARBARIAN_JSON', $config_file);
+        break;
+    }
+}
+function barbarian_json_migration_start()
+{
+    if(!defined('INIT_PHP_BARBARIAN_JSON')){
+        echo "\e[41;1;97mbarbarian.json not found. You need to use barbarian.json to use the CLI interface.\e[0m" . PHP_EOL;
+        echo 'The "barbarian json" command can generate a barbarian.json for you.';
+        echo PHP_EOL;
+        exit;
+    }
+    $json = @file_get_contents(INIT_PHP_BARBARIAN_JSON);
+    if($json === FALSE){
+        echo "\e[41;1;97mCould not read barbarian.json file.\e[0m" . PHP_EOL;
+        exit;
+    }
+    if(($decode = json_decode($json, true)) === FALSE){
+        echo "\e[41;1;97mCould not parse barbarian.json file.\e[0m" . PHP_EOL;
+        exit;
+    }
+    foreach (['dsn', 'username', 'password', 'folder'] as $key) {
+        if(!isset($decode[$key])){
+            echo "\e[41;1;97mThe barbarian.json file must contain the " . $key . " information.\e[0m" . PHP_EOL;
+            exit;
+        }
+    }
+    try {
+        $pdo = new \PDO($decode['dsn'], $decode['username'], $decode['password'], [
+            \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION
+        ]);
+    }catch (\PDOException $e) {
+        echo PHP_EOL . "\e[41;1;97m";
+        echo $e->getMessage();
+        echo "\e[0m " . PHP_EOL . PHP_EOL;
+        exit;
+    }
+    unset($decode['dsn'], $decode['username'], $decode['password']);
+    return new \InitPHP\Barbarian\Migrations($pdo, $decode['folder'], $decode);
+}
+
+$console = new Console();
+
+$console->register('json', function (Console $console) {
+    $dir = $console->flag('dir', null);
+    if(empty($dir)){
+        if(($dir = getcwd()) === FALSE){
+            $dir = __DIR__;
+        }
+        $dir .= '/';
+    }
+    $path = $dir . 'barbarian.json';
+    if(file_exists($path)){
+        $console->warning("There is already a file in the \"" . $path . "\" path.");
+        exit;
+    }
+    $content = json_encode([
+        'dsn'           => 'mysql:host=localhost;dbname=test;charset=utf8mb4',
+        'username'      => 'root',
+        'password'      => '',
+        'folder'        => $dir . 'App/Migrations/',
+        'table_name'    => 'migrations_versions',
+        'namespace'     => null,
+    ]);
+    if (@file_put_contents($path, $content) === FALSE) {
+        $console->error('Failed to create "barbarian.json".');
+        exit;
+    }
+    $console->success('"'.$path.'" has been created.');
+}, 'Generates "barbarian.json" file.');
+
+$console->register('up', function (Console $console) {
+    $migration = barbarian_json_migration_start();
+    $migrations = $migration->getMigrations();
+    if(($version = $console->flag('version')) !== null){
+        if(isset($migrations[$version])){
+            $class = $migration[$version];
+        }elseif(is_numeric($version) && isset($migrations['Migration_' . $version])){
+            $class = $migrations['Migration_' . $version];
+        }else{
+            $console->error("The relevant migration version could not be found.");
+            echo PHP_EOL;
+            $console->info('Usage : "barbarian up --version=Migration_202212300912" or "barbarian up --version=202212300912"');
+            exit;
+        }
+        $obj = new $class();
+        if(!($obj instanceof \InitPHP\Barbarian\MigrationInterface)){
+            $console->error('The "' . $class . '" class must implement MigrationInterface.');
+            exit;
+        }
+        if($migration->upMigration($obj, true)){
+            $console->success($class . '::up() has been executed.');
+        }else{
+            $console->warning('Failed to execute ' . $class . '::up().');
+        }
+        exit;
+    }
+    foreach ($migrations as $class) {
+        $obj = new $class();
+        if(!($obj instanceof \InitPHP\Barbarian\MigrationInterface)){
+            $console->warning('The "' . $class . '" class must implement MigrationInterface.' . PHP_EOL);
+            continue;
+        }
+        if($migration->upMigration($obj)){
+            $console->success($class . '::up() has been executed.' . PHP_EOL);
+        }else{
+            $console->info('Failed to execute ' . $class . '::up() or it has already been executed.' . PHP_EOL);
+        }
+    }
+}, 'Runs the up() method of the Migration class.');
+
+$console->register('down', function (Console $console) {
+    $migration = barbarian_json_migration_start();
+    $migrations = $migration->getMigrations();
+    if(($version = $console->flag('version')) !== null){
+        if(isset($migrations[$version])){
+            $class = $migration[$version];
+        }elseif(is_numeric($version) && isset($migrations['Migration_' . $version])){
+            $class = $migrations['Migration_' . $version];
+        }else{
+            $console->error("The relevant migration version could not be found.");
+            echo PHP_EOL;
+            $console->info('Usage : "barbarian down --version=Migration_202212300912" or "barbarian down --version=202212300912"');
+            exit;
+        }
+        $obj = new $class();
+        if(!($obj instanceof \InitPHP\Barbarian\MigrationInterface)){
+            $console->error('The "' . $class . '" class must implement MigrationInterface.');
+            exit;
+        }
+        if($migration->downMigration($obj)){
+            $console->success($class . '::down() has been executed.');
+        }else{
+            $console->warning('Failed to execute ' . $class . '::down().');
+        }
+        exit;
+    }
+    foreach ($migrations as $class) {
+        $obj = new $class();
+        if(!($obj instanceof \InitPHP\Barbarian\MigrationInterface)){
+            $console->warning('The "' . $class . '" class must implement MigrationInterface.' . PHP_EOL);
+            continue;
+        }
+        if($migration->downMigration($obj)){
+            $console->success($class . '::down() has been executed.' . PHP_EOL);
+        }else{
+            $console->info('Failed to execute ' . $class . '::down() or it has already been executed.' . PHP_EOL);
+        }
+    }
+}, 'Runs the down() method of the Migration class.');
+
+
+$console->run();

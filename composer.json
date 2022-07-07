@@ -1,0 +1,29 @@
+{
+    "name": "initphp/barbarian",
+    "description": "Small library that can be used for database migrations.",
+    "type": "library",
+    "license": "MIT",
+    "autoload": {
+        "psr-4": {
+            "InitPHP\\Barbarian\\": "src/"
+        }
+    },
+    "authors": [
+        {
+            "name": "Muhammet ŞAFAK",
+            "email": "info@muhammetsafak.com.tr",
+            "role": "Developer",
+            "homepage": "https://www.muhammetsafak.com.tr"
+        }
+    ],
+    "minimum-stability": "stable",
+    "require": {
+        "php":  ">=7.4",
+        "ext-pdo": "*",
+        "ext-json": "*",
+        "initphp/console": "^1.0"
+    },
+    "bin": [
+        "barbarian"
+    ]
+}
