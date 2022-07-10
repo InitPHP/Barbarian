@@ -7,7 +7,7 @@
  * @author     Muhammet ŞAFAK <info@muhammetsafak.com.tr>
  * @copyright  Copyright © 2022 Muhammet ŞAFAK
  * @license    ./LICENSE  MIT
- * @version    1.0
+ * @version    1.0.1
  * @link       https://www.muhammetsafak.com.tr
  */
 
@@ -127,6 +127,11 @@ class Migrations implements QueryInterface
         return false;
     }
 
+    public function getOption(string $key, $default = null)
+    {
+        return $this->options[$key] ?? $default;
+    }
+
     protected function setMigrationTable(string $table): self
     {
         if(((bool)preg_match('/^[a-zA-Z_]+$/', $table)) === FALSE){
@@ -175,7 +180,6 @@ class Migrations implements QueryInterface
             $this->errors[] = $migration_full_name . ' migration class not found.';
         }
     }
-
 
     private function migration_versions_table_exists()
     {

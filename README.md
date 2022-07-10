@@ -94,44 +94,50 @@ To use the CLI interface, first create the "`barbarian.json`" file in your worki
 Or you can try to create this file with the command below.
 
 ```
-php barbarian json
+vendor/bin/barbarian json
+```
+
+You can use the command below to create a new migration class.
+
+```
+vendor/bin/barbarian create
 ```
 
 You can use the command below to up all migrations.
 
 ```
-php barbarian up
+vendor/bin/barbarian up
 ```
 
 You can use the `-version` flag to only up a migration.
 
 ```
-php barbarian up -version=20221230153013
+vendor/bin/barbarian up -version=20221230153013
 ```
 
 or
 
 ```
-php barbarian up -version=Migration_20221230153013
+vendor/bin/barbarian up -version=Migration_20221230153013
 ```
 
 
 You can use the command below to down all migrations.
 
 ```
-php barbarian down
+vendor/bin/barbarian down
 ```
 
 You can use the `-version` flag to only up a migration.
 
 ```
-php barbarian down -version=20221230153013
+vendor/bin/barbarian down -version=20221230153013
 ```
 
 or
 
 ```
-php barbarian down -version=Migration_20221230153013
+vendor/bin/barbarian down -version=Migration_20221230153013
 ```
 
 ## Credits
