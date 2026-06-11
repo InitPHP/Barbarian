@@ -1,12 +1,25 @@
 {
     "name": "initphp/barbarian",
-    "description": "Small library that can be used for database migrations.",
+    "description": "Small, dependency-light database migration library for PHP with a PDO-based runner and a CLI.",
     "type": "library",
     "license": "MIT",
-    "autoload": {
-        "psr-4": {
-            "InitPHP\\Barbarian\\": "src/"
-        }
+    "keywords": [
+        "migration",
+        "migrations",
+        "database",
+        "schema",
+        "pdo",
+        "mysql",
+        "sqlite",
+        "pgsql",
+        "cli",
+        "initphp"
+    ],
+    "homepage": "https://github.com/InitPHP/Barbarian",
+    "support": {
+        "issues": "https://github.com/InitPHP/Barbarian/issues",
+        "source": "https://github.com/InitPHP/Barbarian",
+        "docs": "https://github.com/InitPHP/Barbarian/tree/main/docs"
     },
     "authors": [
         {
@@ -16,14 +29,52 @@
             "homepage": "https://www.muhammetsafak.com.tr"
         }
     ],
-    "minimum-stability": "stable",
     "require": {
-        "php":  ">=7.4",
+        "php": ">=8.1",
         "ext-pdo": "*",
         "ext-json": "*",
-        "initphp/console": "^1.0"
+        "initphp/console": "^2.1"
+    },
+    "require-dev": {
+        "ext-pdo_sqlite": "*",
+        "phpunit/phpunit": "^9.6 || ^10.5",
+        "squizlabs/php_codesniffer": "^3.7",
+        "phpstan/phpstan": "^1.11"
+    },
+    "suggest": {
+        "ext-pdo_mysql": "To run migrations against MySQL/MariaDB.",
+        "ext-pdo_sqlite": "To run migrations against SQLite.",
+        "ext-pdo_pgsql": "To run migrations against PostgreSQL."
+    },
+    "autoload": {
+        "psr-4": {
+            "InitPHP\\Barbarian\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Test\\InitPHP\\Barbarian\\": "tests/"
+        }
     },
     "bin": [
         "barbarian"
-    ]
+    ],
+    "scripts": {
+        "test": "phpunit --testsuite unit",
+        "test:integration": "phpunit --testsuite integration",
+        "test:coverage": "phpunit --testsuite unit --coverage-text --coverage-html=build/coverage",
+        "cs": "phpcs",
+        "cs-ci": "phpcs --warning-severity=0",
+        "cs-fix": "phpcbf",
+        "stan": "phpstan analyse",
+        "qa": [
+            "@cs-ci",
+            "@stan",
+            "@test"
+        ]
+    },
+    "minimum-stability": "stable",
+    "config": {
+        "sort-packages": true
+    }
 }

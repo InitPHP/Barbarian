@@ -1,0 +1,120 @@
+name: CI
+
+on:
+  push:
+    branches: [main, '*.x']
+  pull_request:
+    branches: [main, '*.x']
+
+permissions:
+  contents: read
+
+jobs:
+  qa:
+    name: PHP ${{ matrix.php }} / QA
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['8.1', '8.2', '8.3', '8.4']
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: pdo, pdo_sqlite, json, mbstring
+          coverage: none
+          tools: composer:v2
+        env:
+          COMPOSER_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Validate composer.json
+        run: composer validate --strict
+
+      - name: Get Composer cache directory
+        id: composer-cache
+        run: echo "dir=$(composer config cache-files-dir)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Composer dependencies
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: composer-${{ runner.os }}-${{ matrix.php }}-${{ hashFiles('composer.json') }}
+          restore-keys: |
+            composer-${{ runner.os }}-${{ matrix.php }}-
+
+      - name: Install dependencies
+        run: composer update --prefer-dist --no-progress --no-interaction
+
+      - name: Coding standards (phpcs)
+        run: composer cs-ci
+
+      - name: Static analysis (PHPStan)
+        run: composer stan
+
+      - name: Unit tests (PHPUnit)
+        run: composer test
+
+  integration:
+    name: Integration (MySQL + PostgreSQL)
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: barbarian
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=15
+
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: barbarian
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: pdo, pdo_mysql, pdo_pgsql, json, mbstring
+          coverage: none
+          tools: composer:v2
+        env:
+          COMPOSER_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install dependencies
+        run: composer update --prefer-dist --no-progress --no-interaction
+
+      - name: Integration tests (PHPUnit)
+        env:
+          BARBARIAN_MYSQL_DSN: "mysql:host=127.0.0.1;port=3306;dbname=barbarian;charset=utf8mb4"
+          BARBARIAN_MYSQL_USER: root
+          BARBARIAN_MYSQL_PASSWORD: root
+          BARBARIAN_PGSQL_DSN: "pgsql:host=127.0.0.1;port=5432;dbname=barbarian"
+          BARBARIAN_PGSQL_USER: postgres
+          BARBARIAN_PGSQL_PASSWORD: postgres
+        run: composer test:integration

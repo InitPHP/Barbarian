@@ -1,13 +1,13 @@
 <?php
+
 /**
  * Migrations.php
  *
- * This file is part of Barbarian.
+ * This file is part of InitPHP Barbarian.
  *
  * @author     Muhammet ŞAFAK <info@muhammetsafak.com.tr>
  * @copyright  Copyright © 2022 Muhammet ŞAFAK
- * @license    ./LICENSE  MIT
- * @version    1.0.1
+ * @license    https://github.com/InitPHP/Barbarian/blob/main/LICENSE  MIT
  * @link       https://www.muhammetsafak.com.tr
  */
 
@@ -15,201 +15,397 @@ declare(strict_types=1);
 
 namespace InitPHP\Barbarian;
 
-use \PDO;
+use InitPHP\Barbarian\Schema\Grammar;
+use InvalidArgumentException;
+use PDO;
 
-class Migrations implements QueryInterface
+use function array_key_exists;
+use function array_keys;
+use function basename;
+use function class_exists;
+use function date;
+use function glob;
+use function is_array;
+use function is_dir;
+use function is_subclass_of;
+use function preg_match;
+use function rtrim;
+use function sort;
+use function strrpos;
+
+/**
+ * Discovers migration classes on disk, keeps a version table in sync and runs
+ * the up()/down() side of a migration on demand.
+ *
+ * The connection is wrapped in a {@see QueryRunner} (the {@see QueryInterface}
+ * handed to each migration), so this class orchestrates migrations without
+ * being a query gateway itself.
+ */
+final class Migrations
 {
+    private QueryRunner $runner;
 
-    protected const UP_STATUS      = 1;
-    protected const DOWN_STATUS    = 0;
+    private Grammar $grammar;
 
-    protected ?PDO $pdo;
+    private string $folder;
 
-    protected array $options = [
-        'folder'            => null,
-        'namespace'         => null,
-        'migrationTable'    => 'migrations_versions',
-    ];
+    private ?string $namespace = null;
 
-    protected string $driver;
+    private string $migrationTable = 'migrations_versions';
 
-    protected array $errors = [];
+    /**
+     * Discovered migrations, keyed by version name (the unqualified class
+     * name) and mapped to the fully-qualified class name.
+     *
+     * @var array<string, class-string<MigrationInterface>>
+     */
+    private array $migrations = [];
 
-    protected array $migrations = [];
+    /**
+     * Human-readable problems found while scanning the migration folder.
+     *
+     * @var array<int, string>
+     */
+    private array $errors = [];
 
-    public function __construct(PDO &$pdo, string $folder, array $options = [])
+    /**
+     * @param PDO                  $pdo     The database connection.
+     * @param string               $folder  Directory holding the `Migration_*.php` files.
+     * @param array<string, mixed> $options Recognised keys: `namespace` (?string) and
+     *                                      `migrationTable` (string). Unknown keys are ignored.
+     * @throws InvalidArgumentException When the folder does not exist or the table name is invalid.
+     * @throws MigrationException When the version table cannot be created or the folder cannot be read.
+     */
+    public function __construct(PDO $pdo, string $folder, array $options = [])
     {
+        $this->runner = new QueryRunner($pdo);
+        $this->grammar = new Grammar($this->runner->driver());
+
         $this->setFolder($folder);
-        $this->pdo = $pdo;
-        foreach ($options as $key => $value) {
-            if(is_numeric($key) || is_iterable($value)){
-                continue;
-            }
-            $method = 'set' . ucfirst($key);
-            if(!method_exists($this, $method)){
-                continue;
-            }
-            $this->{$method}($value);
+        if (array_key_exists('namespace', $options)) {
+            $this->setNamespace($options['namespace'] === null ? null : (string) $options['namespace']);
         }
-        $this->setUp();
+        if (array_key_exists('migrationTable', $options)) {
+            $this->setMigrationTable((string) $options['migrationTable']);
+        }
+
+        $this->ensureVersionTable();
+        $this->scanFolder();
     }
 
     /**
-     * @inheritDoc
+     * The discovered migrations, keyed by version name.
+     *
+     * @return array<string, class-string<MigrationInterface>>
      */
-    public function query(string $sql, ?array $arguments = null)
-    {
-        if(($query = $this->pdo->prepare($sql)) === FALSE){
-            return false;
-        }
-        if($query->execute((empty($arguments) ? null : $arguments)) === FALSE){
-            return false;
-        }
-        return $query;
-    }
-
     public function getMigrations(): array
     {
         return $this->migrations;
     }
 
-    public function getError(): array
+    /**
+     * Problems collected while scanning the migration folder (e.g. files that
+     * did not declare the expected class).
+     *
+     * @return array<int, string>
+     */
+    public function getErrors(): array
     {
         return $this->errors;
     }
 
+    /**
+     * The normalised migration folder (always ending in a directory separator).
+     */
+    public function getFolder(): string
+    {
+        return $this->folder;
+    }
+
+    /**
+     * The namespace migration classes live under, or null when they are global.
+     */
+    public function getNamespace(): ?string
+    {
+        return $this->namespace;
+    }
+
+    /**
+     * The name of the version table.
+     */
+    public function getMigrationTable(): string
+    {
+        return $this->migrationTable;
+    }
+
+    /**
+     * Applies a migration's up() side and records it as {@see MigrationStatus::Up}.
+     *
+     * A migration already at {@see MigrationStatus::Up} is skipped unless
+     * `$force` is true. When up() returns false the state is left untouched so
+     * the migration can be retried.
+     *
+     * @param MigrationInterface $migration The migration to apply.
+     * @param bool               $force     Re-run even when already up.
+     * @return bool True when up() ran and the state was recorded; false otherwise.
+     * @throws \PDOException On a database error.
+     */
     public function upMigration(MigrationInterface $migration, bool $force = false): bool
     {
-        $version_name = $migration->getName();
-        $query = $this->query("SELECT * FROM " . $this->options['migrationTable'] . " WHERE version_name = :version_name", [
-            ':version_name'     => $version_name
-        ]);
-        if($query === FALSE){
+        $versionName = $migration->getName();
+        $record = $this->findRecord($versionName);
+
+        if ($record !== null && $this->statusOf($record) === MigrationStatus::Up && $force === false) {
             return false;
         }
 
-        if($query->rowCount() > 0){
-            $row = $query->fetch(PDO::FETCH_ASSOC);
-            if((isset($row['status']) && $row['status'] === self::DOWN_STATUS) || $force === TRUE){
-                call_user_func_array([$migration, 'up'], [$this]);
-                $this->query("UPDATE " . $this->options['migrationTable'] . " SET status = " . self::UP_STATUS . ", last_time = '".date("c")."' WHERE version_name = :version_name", [
-                    ':version_name'  => $version_name
-                ]);
-                return true;
-            }
+        if ($migration->up($this->runner) === false) {
             return false;
         }
-        call_user_func_array([$migration, 'up'], [$this]);
-        $this->query("INSERT INTO " . $this->options['migrationTable'] . " (version_name, status) VALUES ('" . $version_name . "', '" . self::UP_STATUS . "');");
+
+        if ($record === null) {
+            $this->insertRecord($versionName, MigrationStatus::Up);
+        } else {
+            $this->updateStatus($versionName, MigrationStatus::Up);
+        }
+
         return true;
     }
 
-    public function downMigration(MigrationInterface $migration): bool
+    /**
+     * Reverts a migration's down() side and records it as {@see MigrationStatus::Down}.
+     *
+     * A migration that was never applied, or is already at
+     * {@see MigrationStatus::Down} (unless `$force` is true), is skipped. When
+     * down() returns false the state is left untouched.
+     *
+     * @param MigrationInterface $migration The migration to revert.
+     * @param bool               $force     Re-run even when already down.
+     * @return bool True when down() ran and the state was recorded; false otherwise.
+     * @throws \PDOException On a database error.
+     */
+    public function downMigration(MigrationInterface $migration, bool $force = false): bool
     {
-        $version_name = $migration->getName();
-        $query = $this->query("SELECT * FROM " . $this->options['migrationTable'] . " WHERE version_name = :version_name", [
-            ':version_name'     => $version_name
-        ]);
-        if($query === FALSE){
+        $versionName = $migration->getName();
+        $record = $this->findRecord($versionName);
+
+        if ($record === null) {
             return false;
         }
-        if($query->rowCount() < 1){
+        if ($this->statusOf($record) === MigrationStatus::Down && $force === false) {
             return false;
         }
-        $row = $query->fetch(PDO::FETCH_ASSOC);
-        if(isset($row['status']) && $row['status'] === self::UP_STATUS){
-            call_user_func_array([$migration, 'down'], [$this]);
-            $this->query("UPDATE " . $this->options['migrationTable'] . " SET status = " . self::DOWN_STATUS . ", last_time = '".date("c")."' WHERE version_name = :version_name", [
-                ':version_name'     => $version_name
-            ]);
-            return true;
+
+        if ($migration->down($this->runner) === false) {
+            return false;
         }
-        return false;
+
+        $this->updateStatus($versionName, MigrationStatus::Down);
+
+        return true;
     }
 
-    public function getOption(string $key, $default = null)
+    /**
+     * Returns the recorded status of a migration, or null when it has never
+     * been applied.
+     *
+     * @param MigrationInterface|string $migration A migration instance or its version name.
+     * @throws \PDOException On a database error.
+     */
+    public function status(MigrationInterface|string $migration): ?MigrationStatus
     {
-        return $this->options[$key] ?? $default;
+        $versionName = $migration instanceof MigrationInterface ? $migration->getName() : $migration;
+        $record = $this->findRecord($versionName);
+
+        return $record === null ? null : $this->statusOf($record);
     }
 
-    protected function setMigrationTable(string $table): self
+    /**
+     * Returns the status of every discovered migration, keyed by version name.
+     * A null value means the migration has not been applied yet.
+     *
+     * @return array<string, MigrationStatus|null>
+     * @throws \PDOException On a database error.
+     */
+    public function getStatuses(): array
     {
-        if(((bool)preg_match('/^[a-zA-Z_]+$/', $table)) === FALSE){
-            throw new \InvalidArgumentException('The migration table name can only be alphabetical.');
+        $statuses = [];
+        foreach (array_keys($this->migrations) as $versionName) {
+            $statuses[$versionName] = $this->status($versionName);
         }
-        $this->options['migrationTable'] = $table;
-        return $this;
+
+        return $statuses;
     }
 
-    protected function setFolder(string $folder): self
+    /**
+     * Validates and stores the migration folder.
+     *
+     * @throws InvalidArgumentException When the directory does not exist.
+     */
+    private function setFolder(string $folder): void
     {
-        if(!is_dir($folder)){
-            throw new \InvalidArgumentException('The specified file location (directory) for migration files could not be found.');
+        if (!is_dir($folder)) {
+            throw new InvalidArgumentException(
+                'The migration folder could not be found: ' . $folder
+            );
         }
-        $folder = rtrim($folder, "\\/") . DIRECTORY_SEPARATOR;
-        $this->options['folder'] = $folder;
-        return $this;
+        $this->folder = rtrim($folder, '\\/') . DIRECTORY_SEPARATOR;
     }
 
-    protected function setUp()
+    /**
+     * Normalises and stores the migration namespace (without surrounding
+     * backslashes); an empty namespace is treated as null.
+     */
+    private function setNamespace(?string $namespace): void
     {
-        if(!isset($this->driver)){
-            $this->driver = $this->pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
+        if ($namespace === null) {
+            $this->namespace = null;
+
+            return;
         }
-        $this->migration_versions_table_exists();
-        $this->folder_scan();
+        $namespace = trim($namespace, '\\');
+        $this->namespace = $namespace === '' ? null : $namespace;
     }
 
-    protected function folder_scan()
+    /**
+     * Validates and stores the version table name.
+     *
+     * @throws InvalidArgumentException When the name is not a safe SQL identifier.
+     */
+    private function setMigrationTable(string $table): void
     {
-        if(($glob = glob($this->options['folder'] . 'Migration_*.php')) === FALSE){
-            throw new MigrationException('Could not read the migration folder content.');
+        if (preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $table) !== 1) {
+            throw new InvalidArgumentException(
+                'The migration table name may only contain letters, digits and '
+                . 'underscores and must not begin with a digit.'
+            );
         }
-        foreach ($glob as $file) {
-            $migration = basename($file, '.php');
-            $migration_full_name = empty($this->options['namespace']) ? $migration : $this->options['namespace'] . $migration;
-            if(class_exists($migration_full_name)){
-                $this->migrations[$migration] = $migration_full_name;
+        $this->migrationTable = $table;
+    }
+
+    /**
+     * Builds the candidate fully-qualified class name for a version (short)
+     * name, prefixing the configured namespace when there is one.
+     */
+    private function resolveClassName(string $shortName): string
+    {
+        return $this->namespace === null ? $shortName : $this->namespace . '\\' . $shortName;
+    }
+
+    /**
+     * Scans the migration folder for `Migration_*.php` files and records the
+     * migration classes they declare, collecting an error for any file that
+     * does not declare a {@see MigrationInterface} implementation.
+     *
+     * @throws MigrationException When the folder cannot be read.
+     */
+    private function scanFolder(): void
+    {
+        $files = glob($this->folder . 'Migration_*.php');
+        if ($files === false) {
+            throw new MigrationException('Could not read the migration folder: ' . $this->folder);
+        }
+        sort($files);
+
+        foreach ($files as $file) {
+            $shortName = basename($file, '.php');
+            $class = $this->resolveClassName($shortName);
+            if (!class_exists($class)) {
+                require_once $file;
+            }
+            if (!class_exists($class)) {
+                $this->errors[] = $class . ' migration class not found.';
+
                 continue;
             }
-            require_once $file;
-            if(class_exists($migration_full_name)){
-                $this->migrations[$migration] = $migration_full_name;
+            if (!is_subclass_of($class, MigrationInterface::class)) {
+                $this->errors[] = $class . ' must implement ' . MigrationInterface::class . '.';
+
                 continue;
             }
-            $this->errors[] = $migration_full_name . ' migration class not found.';
+            $this->migrations[$shortName] = $class;
         }
     }
 
-    private function migration_versions_table_exists()
+    /**
+     * Creates the version table when it does not already exist.
+     *
+     * @throws \PDOException On a database error.
+     */
+    private function ensureVersionTable(): void
     {
-        switch ($this->driver) {
-            case 'psql':
-            case 'pgsql':
-            case 'postgres':
-            case 'postgresql':
-                $sql = "CREATE TABLE IF NOT EXISTS " . $this->options['migrationTable'] . " (id INT NOT NULL, version_name VARCHAR(255) NOT NULL, last_time TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP, status INT NOT NULL, PRIMARY KEY (id), FOREIGN KEY (version_name));";
-                break;
-            case 'sqlite':
-                $sql = "CREATE TABLE IF NOT EXISTS " . $this->options['migrationTable'] . " (id INTEGER PRIMARY KEY, version_name TEXT NOT NULL, last_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP, status INTEGER NOT NULL);";
-                break;
-            case 'mysql':
-            default:
-                $sql = "CREATE TABLE IF NOT EXISTS " . $this->options['migrationTable'] . " (id int(11) NOT NULL AUTO_INCREMENT, version_name varchar(255) NOT NULL, last_time datetime NOT NULL DEFAULT current_timestamp(), status int(1) NOT NULL, PRIMARY KEY (id), KEY version_name (version_name)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;";
-                break;
-        }
-        if ($this->query($sql) === FALSE) {
-            throw new MigrationException('Failed to create version table.');
-        }
+        $this->runner->query($this->grammar->createVersionTable($this->migrationTable));
     }
 
+    /**
+     * Fetches the version table row for a migration, or null when absent.
+     *
+     * @return array<string, mixed>|null
+     * @throws \PDOException On a database error.
+     */
+    private function findRecord(string $versionName): ?array
+    {
+        $statement = $this->runner->query(
+            'SELECT * FROM ' . $this->table() . ' WHERE version_name = :version_name',
+            [':version_name' => $versionName]
+        );
+        $row = $statement->fetch(PDO::FETCH_ASSOC);
+
+        return is_array($row) ? $row : null;
+    }
+
+    /**
+     * Reads the status out of a version row, normalising the (possibly string)
+     * column value to a {@see MigrationStatus}.
+     *
+     * @param array<string, mixed> $record
+     */
+    private function statusOf(array $record): ?MigrationStatus
+    {
+        return MigrationStatus::tryFrom((int) ($record['status'] ?? -1));
+    }
+
+    /**
+     * Inserts a fresh version row.
+     *
+     * @throws \PDOException On a database error.
+     */
+    private function insertRecord(string $versionName, MigrationStatus $status): void
+    {
+        $this->runner->query(
+            'INSERT INTO ' . $this->table() . ' (version_name, status, last_time) '
+            . 'VALUES (:version_name, :status, :last_time)',
+            [
+                ':version_name' => $versionName,
+                ':status'       => $status->value,
+                ':last_time'    => date('Y-m-d H:i:s'),
+            ]
+        );
+    }
+
+    /**
+     * Updates the status (and last-changed time) of an existing version row.
+     *
+     * @throws \PDOException On a database error.
+     */
+    private function updateStatus(string $versionName, MigrationStatus $status): void
+    {
+        $this->runner->query(
+            'UPDATE ' . $this->table() . ' SET status = :status, last_time = :last_time '
+            . 'WHERE version_name = :version_name',
+            [
+                ':status'       => $status->value,
+                ':last_time'    => date('Y-m-d H:i:s'),
+                ':version_name' => $versionName,
+            ]
+        );
+    }
+
+    /**
+     * The quoted version table name for use in statements.
+     */
+    private function table(): string
+    {
+        return $this->grammar->quoteIdentifier($this->migrationTable);
+    }
 }
-
-
-
-
-
-
-
-
-

@@ -4,3 +4,9 @@
 /vendor/
 /composer.lock
 /Examples/
+/build/
+/barbarian.json
+.phpunit.result.cache
+/phpunit.xml
+/phpcs.xml
+/phpstan.neon.local

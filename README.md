@@ -1,143 +1,190 @@
 # Barbarian
-Small library that can be used for database migrations.
 
-_**Warning :** This library has not yet been fully tested and is under development. Please consider this information when using._
+A small, dependency-light database migration library for PHP. It discovers your
+migration classes on disk, keeps a version table in sync, and runs the
+`up()`/`down()` side of each migration either programmatically or through a
+simple command-line interface.
+
+[![CI](https://github.com/InitPHP/Barbarian/actions/workflows/ci.yml/badge.svg)](https://github.com/InitPHP/Barbarian/actions/workflows/ci.yml)
+[![Latest Stable Version](https://poser.pugx.org/initphp/barbarian/v)](https://packagist.org/packages/initphp/barbarian)
+[![License](https://poser.pugx.org/initphp/barbarian/license)](https://packagist.org/packages/initphp/barbarian)
+
+## Features
+
+- Plain PDO under the hood — works with **MySQL/MariaDB**, **SQLite** and **PostgreSQL**.
+- A tracked version table so each migration is applied (or reverted) exactly once.
+- Idempotent `up`/`down` with an optional `force` to re-run.
+- A small CLI (`init`, `create`, `status`, `up`, `down`) built on [InitPHP Console](https://github.com/InitPHP/Console).
+- Fully typed, PSR-12 compliant, analysed with PHPStan and covered by tests.
 
 ## Requirements
 
-- PHP 7.4 or higher
-- PHP PDO Extension
-- PHP JSON Extension
-- [InitPHP Console Library](https://github.com/InitPHP/Console) 
+- PHP 8.1 or higher
+- `ext-pdo` and the PDO driver for your database (`pdo_mysql`, `pdo_sqlite` or `pdo_pgsql`)
+- `ext-json`
+- [initphp/console](https://github.com/InitPHP/Console) `^2.1` (installed automatically)
 
 ## Installation
 
-```
+```bash
 composer require initphp/barbarian
 ```
 
-## Usage
+## Writing a migration
 
-Start by creating a directory for the Migrations classes. 
+A migration extends `InitPHP\Barbarian\MigrationAbstract` and implements `up()`
+and `down()`. Each method receives a `QueryInterface` to run statements with and
+returns a `bool`: returning `false` (or throwing) tells the runner **not** to
+record the state change, so the migration can be retried.
 
-Let your working directory be `/Migrations/` for example. 
-
-An example migration class would look like this;
+By convention, files are named `Migration_<timestamp>.php` and the class name
+matches the file name.
 
 ```php
 <?php
+
 declare(strict_types=1);
 
 namespace App\Migrations;
 
+use InitPHP\Barbarian\MigrationAbstract;
 use InitPHP\Barbarian\QueryInterface;
 
-class Migration_20220718152243 extends \InitPHP\Barbarian\MigrationAbstract
+final class Migration_20240101000000 extends MigrationAbstract
 {
+    public function up(QueryInterface $query): bool
+    {
+        $query->query('CREATE TABLE IF NOT EXISTS `users` (
+            `id` INT UNSIGNED NOT NULL AUTO_INCREMENT,
+            `name` VARCHAR(255) NOT NULL,
+            `email` VARCHAR(255) NOT NULL,
+            PRIMARY KEY (`id`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;');
 
-    public function up(QueryInterface $query) : bool
-    {
-        $query->query("CREATE TABLE IF NOT EXISTS `users` (
-                    `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT,
-                    `name` varchar(255) NOT NULL,
-                    `mail` varchar(255) NOT NULL,
-                    `status` tinyint(1) NOT NULL DEFAULT 1,
-                    PRIMARY KEY (`id`)
-                    ) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4;");
         return true;
     }
-    
-    public function down(QueryInterface $query) : bool
+
+    public function down(QueryInterface $query): bool
     {
-        $query->query("DROP TABLE `users`");
+        $query->query('DROP TABLE IF EXISTS `users`');
+
         return true;
     }
-    
 }
 ```
 
-### Usage in your PHP code
+## Programmatic usage
 
 ```php
-require_once "vendor/autoload.php";
+require 'vendor/autoload.php';
 
-$pdo = new PDO("mysql:host=localhost;dbname=test;charset=utf8mb4", "root", "");
+use InitPHP\Barbarian\Migrations;
 
-$migration = new \InitPHP\Barbarian\Migrations($pdo, __DIR__ . '/Migrations/', [
-    'migrationTable'    => 'migrations_versions',
-    'namespace'         => '\\App\\Migrations\\' // If you are not using namespace, define NULL.
+$pdo = new PDO('mysql:host=localhost;dbname=test;charset=utf8mb4', 'root', '');
+
+$migrations = new Migrations($pdo, __DIR__ . '/migrations', [
+    'migrationTable' => 'migrations_versions',
+    'namespace'      => 'App\\Migrations', // use null for the global namespace
 ]);
 
+// Apply (up) a single migration:
+$migrations->upMigration(new \App\Migrations\Migration_20240101000000());
 
-// Runs the up() method of a migration object.
-$migration->upMigration(new \App\Migrations\Migration_20221230153013());
+// Revert (down) a single migration:
+$migrations->downMigration(new \App\Migrations\Migration_20240101000000());
 
-// Runs the down() method of a migration object.
-$migration->upMigration(new \App\Migrations\Migration_20221230153013());
+// Or iterate over every discovered migration:
+foreach ($migrations->getMigrations() as $version => $class) {
+    $migrations->upMigration(new $class());
+}
 ```
 
-### Using the Basic CLI
+`upMigration()` and `downMigration()` accept a second `bool $force` argument to
+re-run a migration that has already been applied/reverted. Problems found while
+scanning the folder are available via `getErrors()`.
 
-To use the CLI interface, first create the "`barbarian.json`" file in your working directory and save the following structure by editing it according to you.
+## Command-line usage
+
+First create a `barbarian.json` configuration file in your project root:
+
+```bash
+vendor/bin/barbarian init
+```
+
+This writes a template you then edit:
 
 ```json
 {
-  "dsn":"mysql:host=localhost;dbname=test;charset=utf8mb4",
-  "username":"root",
-  "password":"",
-  "folder":"C:\\xampp\\Projects\\App\\Migrations\\",
-  "table_name":"migrations_versions",
-  "namespace":null
+    "dsn": "mysql:host=localhost;dbname=test;charset=utf8mb4",
+    "username": "root",
+    "password": "",
+    "folder": "/path/to/migrations/",
+    "table_name": "migrations_versions",
+    "namespace": "App\\Migrations"
 }
 ```
 
-Or you can try to create this file with the command below.
+| Key          | Required | Description                                                            |
+|--------------|----------|------------------------------------------------------------------------|
+| `dsn`        | yes      | PDO connection string.                                                  |
+| `username`   | yes      | Database user.                                                          |
+| `password`   | yes      | Database password (may be empty).                                       |
+| `folder`     | yes      | Directory containing the `Migration_*.php` files.                       |
+| `table_name` | no       | Version table name (default `migrations_versions`).                     |
+| `namespace`  | no       | Namespace the migration classes live under, or `null` if global.        |
 
-```
-vendor/bin/barbarian json
-```
+Then:
 
-You can use the command below to create a new migration class.
-
-```
+```bash
+# Create a new, empty migration in the configured folder (no database needed):
 vendor/bin/barbarian create
-```
 
-You can use the command below to up all migrations.
+# Show the status (up / down / pending) of every migration:
+vendor/bin/barbarian status
 
-```
+# Apply every migration (ascending order):
 vendor/bin/barbarian up
-```
 
-You can use the `-version` flag to only up a migration.
+# Apply a single migration (timestamp or full class name):
+vendor/bin/barbarian up --version=20240101000000
+vendor/bin/barbarian up --version=Migration_20240101000000
 
-```
-vendor/bin/barbarian up -version=20221230153013
-```
-
-or
-
-```
-vendor/bin/barbarian up -version=Migration_20221230153013
-```
-
-
-You can use the command below to down all migrations.
-
-```
+# Revert every migration (reverse order):
 vendor/bin/barbarian down
+
+# Revert a single migration:
+vendor/bin/barbarian down --version=20240101000000
 ```
 
-You can use the `-version` flag to only up a migration.
+Every command accepts `--config=/path/to/barbarian.json` to point at a specific
+configuration file (it defaults to `./barbarian.json`).
 
-```
-vendor/bin/barbarian down -version=20221230153013
-```
+## Supported drivers
 
-or
+The version table DDL is generated per driver (`mysql`, `sqlite`, `pgsql`); any
+other driver falls back to the MySQL grammar. The migration statements you write
+in `up()`/`down()` are, of course, your own responsibility to keep portable.
 
-```
-vendor/bin/barbarian down -version=Migration_20221230153013
+## Documentation
+
+In-depth guides with examples live in the [`docs/`](./docs) directory:
+
+- [Installation](./docs/installation.md)
+- [Configuration](./docs/configuration.md)
+- [Writing migrations](./docs/writing-migrations.md)
+- [Command-line usage](./docs/cli-usage.md)
+- [Programmatic usage](./docs/programmatic-usage.md)
+- [Database drivers](./docs/drivers.md)
+- [Extending Barbarian](./docs/extending.md)
+
+## Development
+
+```bash
+composer install
+composer test     # run the PHPUnit suite
+composer cs       # check coding standards (PSR-12)
+composer stan     # run static analysis (PHPStan)
+composer qa       # all of the above
 ```
 
 ## Credits
@@ -146,4 +193,4 @@ vendor/bin/barbarian down -version=Migration_20221230153013
 
 ## License
 
-Copyright &copy; 2022 [MIT License](./LICENSE)
+Released under the [MIT License](./LICENSE).
