@@ -5,6 +5,7 @@ migration classes on disk, keeps a version table in sync, and runs the
 `up()`/`down()` side of each migration either programmatically or through a
 simple command-line interface.
 
+[![Designed & Maintained with Tan](https://www.muhammetsafak.com.tr/badges/designed-maintained-with-tan.svg)](https://www.muhammetsafak.com.tr/en/tan/)
 [![CI](https://github.com/InitPHP/Barbarian/actions/workflows/ci.yml/badge.svg)](https://github.com/InitPHP/Barbarian/actions/workflows/ci.yml)
 [![Latest Stable Version](https://poser.pugx.org/initphp/barbarian/v)](https://packagist.org/packages/initphp/barbarian)
 [![License](https://poser.pugx.org/initphp/barbarian/license)](https://packagist.org/packages/initphp/barbarian)
