@@ -7,7 +7,7 @@ changes. This page summarises what changed and how to adapt.
 
 | Area | 1.x | 2.0 |
 | --- | --- | --- |
-| Minimum PHP | 7.4 | **8.2** (8.1 in 2.0.0) |
+| Minimum PHP | 7.4 | **8.1** in 2.x, **8.2** from 3.0.0 |
 | `initphp/console` | `^1.0` | **`^2.1`** |
 | CLI flags | `-version=` | **`--version=`** |
 | `json` command | `json` | **`init`** |
@@ -18,7 +18,7 @@ changes. This page summarises what changed and how to adapt.
 ## Requirements
 
 - Upgrade to **PHP 8.2+**.
-- `composer require initphp/barbarian:^2.0` — this also pulls in
+- `composer require initphp/barbarian:^3.0` — this also pulls in
   `initphp/console:^2.1`.
 
 ## Breaking changes and how to adapt
