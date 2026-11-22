@@ -42,7 +42,7 @@ abstract class BarbarianCommand extends Command
             InputArgument::STR,
             '',
             true,
-            'Path to the barbarian.json file (defaults to ./barbarian.json).'
+            'Path to the barbarian.json file (defaults to ./barbarian.json).',
         );
     }
 

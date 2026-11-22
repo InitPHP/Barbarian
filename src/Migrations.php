@@ -31,7 +31,6 @@ use function is_subclass_of;
 use function preg_match;
 use function rtrim;
 use function sort;
-use function strrpos;
 
 /**
  * Discovers migration classes on disk, keeps a version table in sync and runs
@@ -246,7 +245,7 @@ final class Migrations
     {
         if (!is_dir($folder)) {
             throw new InvalidArgumentException(
-                'The migration folder could not be found: ' . $folder
+                'The migration folder could not be found: ' . $folder,
             );
         }
         $this->folder = rtrim($folder, '\\/') . DIRECTORY_SEPARATOR;
@@ -277,7 +276,7 @@ final class Migrations
         if (preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $table) !== 1) {
             throw new InvalidArgumentException(
                 'The migration table name may only contain letters, digits and '
-                . 'underscores and must not begin with a digit.'
+                . 'underscores and must not begin with a digit.',
             );
         }
         $this->migrationTable = $table;
@@ -347,7 +346,7 @@ final class Migrations
     {
         $statement = $this->runner->query(
             'SELECT * FROM ' . $this->table() . ' WHERE version_name = :version_name',
-            [':version_name' => $versionName]
+            [':version_name' => $versionName],
         );
         $row = $statement->fetch(PDO::FETCH_ASSOC);
 
@@ -379,7 +378,7 @@ final class Migrations
                 ':version_name' => $versionName,
                 ':status'       => $status->value,
                 ':last_time'    => date('Y-m-d H:i:s'),
-            ]
+            ],
         );
     }
 
@@ -397,7 +396,7 @@ final class Migrations
                 ':status'       => $status->value,
                 ':last_time'    => date('Y-m-d H:i:s'),
                 ':version_name' => $versionName,
-            ]
+            ],
         );
     }
 

@@ -22,6 +22,4 @@ use Exception;
  * migration folder, an invalid configuration file, a failed connection — as
  * opposed to {@see \PDOException}s raised while executing migration statements.
  */
-class MigrationException extends Exception
-{
-}
+class MigrationException extends Exception {}

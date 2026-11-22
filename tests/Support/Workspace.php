@@ -36,7 +36,7 @@ final class Workspace
         }
 
         $dir = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'barb_ws_' . bin2hex(random_bytes(6));
-        mkdir($dir, 0777, true);
+        mkdir($dir, 0o777, true);
         self::$dirs[] = $dir;
 
         return $dir;
@@ -66,7 +66,7 @@ final class Workspace
         string $className,
         ?string $namespace = null,
         bool $up = true,
-        bool $down = true
+        bool $down = true,
     ): string {
         $table = 't_' . strtolower($className);
         $namespaceLine = $namespace === null ? '' : "namespace {$namespace};\n\n";

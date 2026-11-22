@@ -43,7 +43,7 @@ final class ManagerFactory
             throw new MigrationException(
                 'Database connection failed: ' . $exception->getMessage(),
                 (int) $exception->getCode(),
-                $exception
+                $exception,
             );
         }
 

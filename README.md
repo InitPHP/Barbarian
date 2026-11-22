@@ -16,11 +16,11 @@ simple command-line interface.
 - A tracked version table so each migration is applied (or reverted) exactly once.
 - Idempotent `up`/`down` with an optional `force` to re-run.
 - A small CLI (`init`, `create`, `status`, `up`, `down`) built on [InitPHP Console](https://github.com/InitPHP/Console).
-- Fully typed, PSR-12 compliant, analysed with PHPStan and covered by tests.
+- Fully typed, PER-CS compliant, analysed with PHPStan and covered by tests.
 
 ## Requirements
 
-- PHP 8.1 or higher
+- PHP 8.2 or higher
 - `ext-pdo` and the PDO driver for your database (`pdo_mysql`, `pdo_sqlite` or `pdo_pgsql`)
 - `ext-json`
 - [initphp/console](https://github.com/InitPHP/Console) `^2.1` (installed automatically)
@@ -183,7 +183,7 @@ In-depth guides with examples live in the [`docs/`](./docs) directory:
 ```bash
 composer install
 composer test     # run the PHPUnit suite
-composer cs       # check coding standards (PSR-12)
+composer cs       # check coding standards (PER-CS)
 composer stan     # run static analysis (PHPStan)
 composer qa       # all of the above
 ```

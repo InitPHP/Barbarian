@@ -28,7 +28,6 @@ final class Config
         public readonly string $password,
         public readonly string $folder,
         public readonly string $migrationTable,
-        public readonly ?string $namespace
-    ) {
-    }
+        public readonly ?string $namespace,
+    ) {}
 }

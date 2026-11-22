@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Test\InitPHP\Barbarian;
 
-use InitPHP\Barbarian\MigrationStatus;
 use InitPHP\Barbarian\Migrations;
+use InitPHP\Barbarian\MigrationStatus;
 use InvalidArgumentException;
 use PDO;
 use PHPUnit\Framework\TestCase;
@@ -24,7 +24,7 @@ final class MigrationsTest extends TestCase
     private function tableExists(PDO $pdo, string $table): bool
     {
         $statement = $pdo->query(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name='" . $table . "'"
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='" . $table . "'",
         );
 
         return $statement !== false && $statement->fetchColumn() !== false;
@@ -100,7 +100,7 @@ final class MigrationsTest extends TestCase
         Workspace::writeFile(
             $dir,
             $name . '.php',
-            "<?php\nclass {$name} {}\n"
+            "<?php\nclass {$name} {}\n",
         );
 
         $manager = new Migrations($this->pdo(), $dir);

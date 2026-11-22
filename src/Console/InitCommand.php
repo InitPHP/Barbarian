@@ -65,7 +65,7 @@ final class InitCommand extends Command
                 InputArgument::STR,
                 '',
                 true,
-                'Directory to create barbarian.json in (defaults to the current directory).'
+                'Directory to create barbarian.json in (defaults to the current directory).',
             ),
         ];
     }
@@ -105,7 +105,7 @@ final class InitCommand extends Command
 
         $output->success('Configuration file created: ' . $path);
 
-        if (!is_dir($migrationFolder) && @mkdir($migrationFolder, 0777, true) === false && !is_dir($migrationFolder)) {
+        if (!is_dir($migrationFolder) && @mkdir($migrationFolder, 0o777, true) === false && !is_dir($migrationFolder)) {
             $output->warning('Could not create the migration folder: ' . $migrationFolder);
 
             return;
