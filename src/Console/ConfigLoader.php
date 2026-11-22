@@ -72,7 +72,7 @@ final class ConfigLoader
         foreach (self::REQUIRED_KEYS as $key) {
             if (!array_key_exists($key, $data)) {
                 throw new MigrationException(
-                    'The configuration file must define the "' . $key . '" key: ' . $source
+                    'The configuration file must define the "' . $key . '" key: ' . $source,
                 );
             }
         }
@@ -85,7 +85,7 @@ final class ConfigLoader
             (string) $data['password'],
             (string) $data['folder'],
             (string) ($data['table_name'] ?? $data['migrationTable'] ?? 'migrations_versions'),
-            is_string($namespace) && $namespace !== '' ? $namespace : null
+            is_string($namespace) && $namespace !== '' ? $namespace : null,
         );
     }
 }

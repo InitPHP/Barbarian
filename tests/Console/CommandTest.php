@@ -66,7 +66,7 @@ final class CommandTest extends TestCase
     {
         $pdo = new PDO('sqlite:' . $dbFile, null, null, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
         $statement = $pdo->query(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name='" . $table . "'"
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='" . $table . "'",
         );
 
         return $statement !== false && $statement->fetchColumn() !== false;

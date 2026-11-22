@@ -54,7 +54,7 @@ abstract class DriverTestCase extends TestCase
                 $dsn,
                 is_string($user) ? $user : null,
                 is_string($password) ? $password : null,
-                [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]
+                [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION],
             );
         } catch (PDOException) {
             return null;
@@ -106,7 +106,7 @@ abstract class DriverTestCase extends TestCase
     private function versionStatus(string $versionName): ?int
     {
         $statement = $this->pdo->prepare(
-            'SELECT status FROM migrations_versions WHERE version_name = :version_name'
+            'SELECT status FROM migrations_versions WHERE version_name = :version_name',
         );
         $statement->execute([':version_name' => $versionName]);
         $value = $statement->fetchColumn();

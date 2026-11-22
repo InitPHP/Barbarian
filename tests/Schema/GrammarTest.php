@@ -53,7 +53,7 @@ final class GrammarTest extends TestCase
         $pdo->exec($sql);
 
         $exists = $pdo->query(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name='migrations_versions'"
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='migrations_versions'",
         );
         $this->assertNotFalse($exists);
         $this->assertSame('migrations_versions', $exists->fetchColumn());
