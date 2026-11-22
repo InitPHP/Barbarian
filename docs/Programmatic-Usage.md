@@ -1,7 +1,7 @@
-# Programmatic usage
+# Programmatic Usage
 
-You can drive Barbarian directly from PHP, without the CLI — useful for
-deploy scripts, test bootstrapping or framework integration.
+You can drive Barbarian directly from PHP, without the CLI — useful for deploy
+scripts, test bootstrapping or framework integration.
 
 ## Creating the manager
 
@@ -39,6 +39,10 @@ foreach ($migrations->getErrors() as $error) {
 }
 ```
 
+A file is reported in [`getErrors()`](API-Reference.md#geterrors) (and omitted from
+[`getMigrations()`](API-Reference.md#getmigrations)) when it does not declare a
+class implementing [`MigrationInterface`](API-Reference.md#migrationinterface).
+
 ## Applying and reverting
 
 ```php
@@ -52,12 +56,12 @@ $migrations->downMigration($migration); // revert
 
 Both methods return `bool`:
 
-- `upMigration()` returns `true` when `up()` ran and the state was recorded;
-  `false` when the migration was already up (and not forced) or `up()` returned
-  `false`.
-- `downMigration()` returns `true` when `down()` ran and the state was recorded;
-  `false` when the migration was never applied, is already down (and not forced),
-  or `down()` returned `false`.
+- [`upMigration()`](API-Reference.md#upmigration) returns `true` when `up()` ran and
+  the state was recorded; `false` when the migration was already up (and not
+  forced) or `up()` returned `false`.
+- [`downMigration()`](API-Reference.md#downmigration) returns `true` when `down()`
+  ran and the state was recorded; `false` when the migration was never applied,
+  is already down (and not forced), or `down()` returned `false`.
 
 ### Running everything
 
@@ -85,23 +89,7 @@ $migrations->upMigration($migration, true);   // re-run up()
 $migrations->downMigration($migration, true); // re-run down()
 ```
 
-## Status
-
-The recorded state is modelled by the `InitPHP\Barbarian\MigrationStatus`
-backed enum:
-
-```php
-use InitPHP\Barbarian\MigrationStatus;
-
-MigrationStatus::Down->value; // 0
-MigrationStatus::Up->value;   // 1
-```
-
-These integers are exactly what is stored in the version table's `status`
-column; comparisons are made on the integer value, so the library does not rely
-on the PDO driver returning a particular PHP type.
-
-### Querying status
+## Reading status
 
 ```php
 use InitPHP\Barbarian\MigrationStatus;
@@ -116,12 +104,25 @@ foreach ($migrations->getStatuses() as $version => $status) {
 }
 ```
 
-This is exactly what the [`status` CLI command](./cli-usage.md#status--inspect-migrations) renders.
+This is exactly what the [`status`](CLI-Commands.md#status--inspect-migrations) CLI
+command renders.
+
+## The status enum
+
+The recorded state is modelled by [`MigrationStatus`](API-Reference.md#migrationstatus):
+
+```php
+use InitPHP\Barbarian\MigrationStatus;
+
+MigrationStatus::Down->value; // 0
+MigrationStatus::Up->value;   // 1
+```
+
+These integers are exactly what is stored in the version table's `status`
+column; comparisons are made on the integer value, so the library does not rely
+on the PDO driver returning a particular PHP type.
 
 ## Building the manager from a config file
-
-If you want the CLI's configuration handling in your own code, reuse the console
-helpers:
 
 ```php
 use InitPHP\Barbarian\Console\ConfigLoader;
@@ -133,12 +134,16 @@ $migrations = ManagerFactory::fromConfig($config);
 
 ## Error handling
 
-- Configuration/discovery problems (missing folder, unreadable config, failed
-  connection) throw `InitPHP\Barbarian\MigrationException`.
-- A bad table name throws `InvalidArgumentException`.
-- Database errors while executing statements throw `\PDOException`.
+| Failure | Exception |
+| --- | --- |
+| Missing folder, unreadable/invalid config, failed connection | [`MigrationException`](Exceptions.md#migrationexception) |
+| Invalid table name | `InvalidArgumentException` |
+| Database error while executing a statement | `\PDOException` |
+
+See [Exceptions](Exceptions.md) for the full picture.
 
 ## Next steps
 
-- [Writing migrations](./writing-migrations.md)
-- [Extending Barbarian](./extending.md)
+- [Writing Migrations](Writing-Migrations.md)
+- [Extending](Extending.md)
+- [API Reference](API-Reference.md)
