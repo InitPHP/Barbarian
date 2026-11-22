@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed (breaking)
 
+- **Requires `initphp/console` `^3.0`** (was `^2.1`). Projects that depend on `initphp/console` directly must raise their constraint too.
 - **Requires PHP `^8.2`.** Support for PHP 8.1 is dropped; CI now runs PHP 8.2, 8.3, 8.4 and 8.5.
 - **Coding standard moved from PSR-12 (PHP_CodeSniffer) to PER-CS (php-cs-fixer)** through the shared `.php-cs-fixer.dist.php`; `phpcs.xml.dist` and `squizlabs/php_codesniffer` are removed and the whole code base was reformatted. The `cs`, `cs-ci` and `cs-fix` Composer scripts now run php-cs-fixer, and `cs-check` is added.
 

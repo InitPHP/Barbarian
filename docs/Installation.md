@@ -8,7 +8,7 @@
 | `ext-pdo` | Required |
 | PDO driver | `pdo_mysql`, `pdo_sqlite` or `pdo_pgsql` for your database |
 | `ext-json` | Required (used to read `barbarian.json`) |
-| [`initphp/console`](https://packagist.org/packages/initphp/console) | `^2.1` (installed automatically) |
+| [`initphp/console`](https://packagist.org/packages/initphp/console) | `^3.0` (installed automatically) |
 
 ## Install with Composer
 

@@ -33,7 +33,7 @@
         "php": "^8.2",
         "ext-pdo": "*",
         "ext-json": "*",
-        "initphp/console": "^2.1"
+        "initphp/console": "^3.0"
     },
     "require-dev": {
         "ext-pdo_sqlite": "*",
