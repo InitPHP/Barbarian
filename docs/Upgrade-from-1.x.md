@@ -19,7 +19,7 @@ changes. This page summarises what changed and how to adapt.
 
 - Upgrade to **PHP 8.2+**.
 - `composer require initphp/barbarian:^3.0` — this also pulls in
-  `initphp/console:^2.1`.
+  `initphp/console:^3.0`.
 
 ## Breaking changes and how to adapt
 

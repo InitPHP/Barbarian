@@ -23,7 +23,7 @@ simple command-line interface.
 - PHP 8.2 or higher
 - `ext-pdo` and the PDO driver for your database (`pdo_mysql`, `pdo_sqlite` or `pdo_pgsql`)
 - `ext-json`
-- [initphp/console](https://github.com/InitPHP/Console) `^2.1` (installed automatically)
+- [initphp/console](https://github.com/InitPHP/Console) `^3.0` (installed automatically)
 
 ## Installation
 

@@ -87,7 +87,7 @@ vendor/bin/barbarian down     # revert all migrations (reverse order)
 
 - **License**: MIT
 - **Minimum PHP**: 8.2 (CI matrix runs 8.2 – 8.5)
-- **Runtime dependencies**: [`initphp/console`](https://packagist.org/packages/initphp/console) `^2.1`
+- **Runtime dependencies**: [`initphp/console`](https://packagist.org/packages/initphp/console) `^3.0`
 - **Required extensions**: `ext-pdo`, `ext-json` (plus the PDO driver for your database)
 - **Supported databases**: MySQL/MariaDB, SQLite, PostgreSQL
 - **Packagist**: [`initphp/barbarian`](https://packagist.org/packages/initphp/barbarian)
