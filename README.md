@@ -168,15 +168,23 @@ in `up()`/`down()` are, of course, your own responsibility to keep portable.
 
 ## Documentation
 
-In-depth guides with examples live in the [`docs/`](./docs) directory:
+In-depth guides with examples live in the [`docs/`](./docs/Home.md) directory:
 
-- [Installation](./docs/installation.md)
-- [Configuration](./docs/configuration.md)
-- [Writing migrations](./docs/writing-migrations.md)
-- [Command-line usage](./docs/cli-usage.md)
-- [Programmatic usage](./docs/programmatic-usage.md)
-- [Database drivers](./docs/drivers.md)
-- [Extending Barbarian](./docs/extending.md)
+- [Installation](./docs/Installation.md)
+- [Quick Start](./docs/Quick-Start.md)
+- [Configuration](./docs/Configuration.md)
+- [Writing Migrations](./docs/Writing-Migrations.md)
+- [CLI Commands](./docs/CLI-Commands.md)
+- [Programmatic Usage](./docs/Programmatic-Usage.md)
+- [Database Drivers](./docs/Database-Drivers.md)
+- [Extending](./docs/Extending.md)
+- [Recipes](./docs/Recipes.md)
+- [Exceptions](./docs/Exceptions.md)
+- [API Reference](./docs/API-Reference.md)
+- [FAQ](./docs/FAQ.md)
+- [Upgrade from 1.x](./docs/Upgrade-from-1.x.md)
+
+The same pages are published as the [wiki](https://github.com/InitPHP/Barbarian/wiki).
 
 ## Development
 
